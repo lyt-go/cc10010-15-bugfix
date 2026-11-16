@@ -4,9 +4,13 @@
 """
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 from app.seed import SEED_ROWS
+
+# 内部数据表：只服务于别的业务模块（例如重跑区间记录），不在运营概览里单独露脸。
+INTERNAL_MODULES = frozenset({"rerun_interval"})
 
 
 class Store:
@@ -14,8 +18,13 @@ class Store:
         self._tables: dict[str, list[dict[str, Any]]] = {
             name: [dict(row) for row in rows] for name, rows in SEED_ROWS.items()
         }
+        # 内存仓库会被 FastAPI 的线程池并发访问；所有跨模块的状态流转共用这一把锁。
+        self.lock = threading.RLock()
 
     def module_names(self) -> list[str]:
+        return sorted(name for name in self._tables if name not in INTERNAL_MODULES)
+
+    def all_module_names(self) -> list[str]:
         return sorted(self._tables)
 
     def rows(self, module: str) -> list[dict[str, Any]]:

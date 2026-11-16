@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Generic, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 T = TypeVar("T")
 
@@ -22,10 +22,21 @@ class ActionResult(BaseModel):
 
 
 class EntryPayload(BaseModel):
-    """登记或修改一条业务记录时提交的字段集合。"""
+    """登记或修改一条业务记录时提交的字段集合。
+
+    除了规范的 ``{"values": {...}}`` 结构，也接受把业务字段（甚至 ``action``）直接放在
+    请求体顶层，避免调用方因为多包一层而登记失败。
+    """
+
+    model_config = ConfigDict(extra="allow")
 
     values: dict[str, Any] = Field(default_factory=dict)
     remark: str | None = None
+
+    def merged_values(self) -> dict[str, Any]:
+        merged = dict(self.model_extra or {})
+        merged.update(self.values)
+        return merged
 
 
 
@@ -90,16 +101,20 @@ class RuntimeEntry(BaseModel):
     field_7: str | None = None  # 错误信息
 
 class RerunEntry(BaseModel):
-    """重跑任务明细结构。"""
+    """重跑任务明细结构。
+
+    ``原始运行编号`` 始终指向运行实例的 ``记录编号``；``重跑区间编号`` 指向唯一区间记录。
+    """
 
     field_0: str | None = None  # 任务编号
-    field_1: str | None = None  # 原始运行编号
+    field_1: str | None = None  # 原始运行编号（同时是运行实例的记录编号）
     field_2: str | None = None  # 重跑区间开始
     field_3: str | None = None  # 重跑区间结束
     field_4: str | None = None  # 重跑原因
     field_5: str | None = None  # 覆盖策略
     field_6: str | None = None  # 依赖级联
     field_7: str | None = None  # 重跑状态
+    field_8: str | None = None  # 重跑区间编号
 
 class BaselineEntry(BaseModel):
     """基线定义明细结构。"""
